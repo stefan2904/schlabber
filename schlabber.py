@@ -15,7 +15,7 @@ class Soup:
             os.makedirs(dirname)
 
     def has_valid_timestamp(self, meta):
-        return meta and 'time' in meta and meta['time']
+        return True
 
     def __init__(self, soup, bup_dir):
         self.rooturl = "http://"+soup+".soup.io"
@@ -37,6 +37,9 @@ class Soup:
 
     def get_asset_name(self, name):
         return name.split('/')[-1].split('.')[0]
+
+    def get_asset_filename(self, name):
+        return name.split('/')[-1]
 
     def get_timstemp(self, post):
         for time_meta in post.find_all("abbr"):
@@ -61,186 +64,92 @@ class Soup:
         with open(filename, 'w') as outfile:
             json.dump(meta, outfile)
 
-    def write_raw(self, post):
-        basepath = self.bup_dir + self.sep + "raw" + self.sep
-        self.assertdir(basepath)
-        with open(basepath + post['id'] + ".html", 'w') as outfile:
-            outfile.write(str(post))
+    def process_assets(self, meta, post):
+        assets = []
+        for link in post.find_all('div', {"class":"imagecontainer"}):
+            lightbox = link.find("a", {"class": "lightbox"})
+            url = None
+            if lightbox:
+                url = lightbox.get('href')
+            else:
+                url = link.find("img").get('src')
+            if url is not None:
+                filename = self.get_asset_filename(url)
+                basepath = self.bup_dir + self.sep + 'assets' + self.sep
+                path = basepath + filename
+                if os.path.isfile(path) == True:
+                    print("\t\t\tSkip " + url + ": File exists")
+                else:
+                    print("\t\t\tsoup_url: " + url + " -> " + path)
+                    self.assertdir(basepath)
+                    r = requests.get(url, allow_redirects=True)
+                    with open(path, "wb") as tf:
+                        tf.write(r.content)
+                assets.append({'url': url, 'filename': filename})
+        meta['assets'] = assets
 
     def process_image(self, post):
         print("\t\tImage:")
         meta = {}
-        meta['time'] = self.get_timstemp(post)
         for caption in post.find_all("div", {'class': 'caption'}):
             meta['source'] = caption.find('a').get("href")
         for desc in post.find_all("div", {'class': 'description'}):
-            meta['text'] = desc.get_text()
-        for link in post.find_all('div', {"class":"imagecontainer"}):
-            lightbox = link.find("a", {"class": "lightbox"})
-            if lightbox:
-                meta['soup_url'] = lightbox.get('href')
-            else:
-                meta['soup_url'] = link.find("img").get('src')
-        if 'soup_url' in meta:
-            basepath = self.bup_dir + self.sep
-            if self.has_valid_timestamp(meta):
-                basepath = basepath + meta['time'][2] + self.sep + meta['time'][0] + self.sep
-            filename = self.get_asset_name(meta['soup_url'])
-            path = basepath + filename + "." + meta['soup_url'].split(".")[-1]
-            if os.path.isfile(path) == True:
-                print("\t\t\tSkip " + meta['soup_url'] + ": File exists")
-            else:
-                print("\t\t\tsoup_url: " + meta['soup_url'] + " -> " + path)
-                self.assertdir(basepath)
-                r = requests.get(meta['soup_url'], allow_redirects=True)
-                with open(path, "wb") as tf:
-                    tf.write(r.content)
-                self.write_raw(post)
+            meta['description'] = str(desc)
+        return meta
 
     def process_quote(self, post):
         print("\t\tQuote:")
         meta = {}
-        meta['time'] = self.get_timstemp(post)
-        body = post.find("span", {"class", 'body'}).get_text()
-        author = post.find("cite").get_text()
-        quote = '"' + body + '"' + "\n\t" + author + "\n"
-        qhash = hashlib.sha256(quote.encode())
-        hashsum = str(qhash.hexdigest().upper())
-        filename = "quote_" + hashsum + ".txt"
-        basepath = self.bup_dir + self.sep
-        if self.has_valid_timestamp(meta):
-            basepath = basepath + meta['time'][2] + self.sep + meta['time'][0] + self.sep
-        path = basepath + filename
-        if os.path.isfile(path) == True:
-            print("\t\t\tSkip: " + filename + ": File exists")
-        else:
-            self.assertdir(basepath)
-            print("\t\t\t-> " + path)
-            with open(path, "w") as qf:
-                qf.write(quote)
-            self.write_raw(post)
-
+        meta['quote'] = str(post.find("span", {"class", 'body'}))
+        meta['attribution'] = str(post.find("cite"))
+        return meta
 
     def process_link(self, post):
         print("\t\tLink:")
         meta = {}
-        meta['time'] = self.get_timstemp(post)
         linkelem = post.find("h3")
-        meta["link_title"] = linkelem.get_text().strip()
+        meta["link_title"] = str(linkelem)
         meta["url"] = linkelem.find('a').get('href')
-        meta["text"] = post.find('span', {'class','body'}).get_text().strip()
-        qhash = hashlib.sha256(meta["url"].encode())
-        hashsum = str(qhash.hexdigest().upper())
-        filename = "dl-link_" + hashsum + ".sh"
-        basepath = self.bup_dir + self.sep
-        if self.has_valid_timestamp(meta):
-            basepath = basepath + meta['time'][2] + self.sep + meta['time'][0] + self.sep
-        path = basepath + filename
-        if os.path.isfile(path) == True:
-            print("\t\t\tSkip: " + filename + ": File exists")
-        else:
-            self.assertdir(basepath)
-            print("\t\t\t-> " + path)
-            filecontent="#! /bin/bash\nwget -c " + meta['url'] + "\n"
-            with open(path, "w") as df:
-                df.write(filecontent)
-            st = os.stat(path)
-            os.chmod(path, st.st_mode | stat.S_IEXEC)
-            self.write_raw(post)
+        meta["body"] = str(post.find('span', {'class','body'}))
+        return meta
 
     def process_video(self, post):
         print("\t\tVideo:")
         meta = {}
-        meta['time'] = self.get_timstemp(post)
-        meta['embeded'] = post.find("div", {'class':'embed'}).prettify()
+        meta['embed'] = str(post.find("div", {'class':'embed'}))
         bodyelem = post.find("div", {'class':'body'})
         if bodyelem:
-            meta['body'] = bodyelem.get_text().strip()
-        else:
-            meta['body'] = "";
-        data = meta['embeded'] + meta['body']
-        qhash = hashlib.sha256(data.encode())
-        hashsum = str(qhash.hexdigest().upper())
-        filename = "video_" + hashsum + ".json"
-        basepath = self.bup_dir + self.sep
-        if self.has_valid_timestamp(meta):
-            basepath = basepath + meta['time'][2] + self.sep + meta['time'][0] + self.sep
-        path = basepath + filename
-        if os.path.isfile(path) == True:
-            print("\t\t\tSkip: " + filename + ": File exists")
-        else:
-            self.assertdir(basepath)
-            print("\t\t\t-> " + path)
-            self.write_raw(post)
+            meta['body'] = str(bodyelem)
+        return meta
 
     def process_file(self, post):
         print("\t\tFile:")
         meta = {}
-        meta['time'] = self.get_timstemp(post)
         linkelem = post.find("h3")
         if linkelem:
-            meta["link_title"] = linkelem.get_text().strip()
-            meta["soup_url"] = linkelem.find('a').get('href')
-        meta["text"] = post.find('div', {'class','body'}).get_text().strip()
-        if 'soup_url' in meta:
-            filename = meta["soup_url"].split("/")[-1]
-        else:
-            filename = "file_unkown"
-        basepath = self.bup_dir + self.sep
-        if self.has_valid_timestamp(meta):
-            basepath = basepath + meta['time'][2] + self.sep + meta['time'][0] + self.sep
-        path = basepath + filename
-        if os.path.isfile(path) == True:
-            print("\t\t\tSkip: " + filename + ": File exists")
-        else:
-            if 'soup_url' in meta:
-                print("\t\t\tsoup_ulr: " + meta['soup_url'] + " -> " + path)
-                self.assertdir(basepath)
-                r = requests.get(meta['soup_url'], allow_redirects=True)
-                with open(path, "wb") as df:
-                    df.write(r.content)
-            self.assertdir(basepath + "meta" + self.sep )
-            jsonname = filename.split(".")[0]
-            self.write_meta(meta, jsonname)
-            self.write_raw(post)
+            meta["link_title"] = str(linkelem)
+            meta["url"] = linkelem.find('a').get('href')
+        meta["body"] = post.find('div', {'class','body'})
+        return meta
 
     def process_review(self, post):
         print("\t\tReview:")
         meta = {}
-        meta['time'] = self.get_timstemp(post)
-        for link in post.find_all('div', {"class":"imagecontainer"}):
-            lightbox = link.find("a", {"class": "lightbox"})
-            if lightbox:
-                meta['soup_url'] = lightbox.get('href')
-            else:
-                meta['soup_url'] = link.find("img").get('src')
+        embed = post.find("div", {'class':'embed'})
+        if embed:
+            meta['embed'] = str(embed)
         descelem = post.find("div", {'class','description'})
         if descelem:
-            meta['description'] = descelem.get_text().strip()
+            meta['description'] = str(descelem)
         meta['rating'] = post.find("abbr", {"class", "rating"}).get("title")
         h3elem = post.find("a", {"class":"url"})
         meta['url'] = h3elem.get("href")
-        meta['title'] = h3elem.get_text()
-        if 'soup_url' in meta:
-            basepath = self.bup_dir + self.sep
-            if self.has_valid_timestamp(meta):
-                basepath = basepath + meta['time'][2] + self.sep + meta['time'][0] + self.sep
-            filename = "review_" + self.get_asset_name(meta['soup_url'])
-            path = basepath + filename + "." + meta['soup_url'].split(".")[-1]
-            if os.path.isfile(path) == True:
-                print("\t\t\tSkip " + meta['soup_url'] + ": File exists")
-            else:
-                print("\t\t\tsoup_ulr: " + meta['soup_url'] + " -> " + path)
-                self.assertdir(basepath)
-                r = requests.get(meta['soup_url'], allow_redirects=True)
-                with open(path, "wb") as tf:
-                    tf.write(r.content)
-                self.write_raw(post)
+        meta['title'] = str(h3elem)
+        return meta
 
     def process_event(self, post):
         print("\t\tEvent:")
         meta = {}
-        meta['time'] = self.get_timstemp(post)
         for link in post.find_all('div', {"class":"imagecontainer"}):
             lightbox = link.find("a", {"class": "lightbox"})
             if lightbox:
@@ -249,80 +158,37 @@ class Soup:
                 meta['soup_url'] = link.find("img").get('src')
         h3elem = post.find("a", {"class":"url"})
         meta['url'] = h3elem.get("href")
-        meta['title'] = h3elem.get_text()
-        meta['dtstart'] = post.find("abbr", {'class':'dtstart'}).get("title")
+        meta['title'] = str(h3elem)
+        meta['date_start'] = post.find("abbr", {'class':'dtstart'}).get("title")
         dtelem = post.find("abbr", {'class':'dtend'})
         if dtelem:
-            meta['dtend'] = dtelem.get("title")
-        meta['location'] = post.find("span", {'class':'location'}).get_text().strip()
+            meta['date_end'] = dtelem.get("title")
+        meta['location'] = post.find("span", {'class':'location'})
         meta['ical_url'] = post.find("div", {'class': 'info'}).find('a').get('href')
+        i = requests.get(meta['ical_url'], allow_redirects=True)
+        meta['ical_xml'] = i.content
         descelem = post.find("div", {'class','description'})
         if descelem:
-            meta['description'] = descelem.get_text().strip()
-        if 'soup_url' in meta:
-            basepath = self.bup_dir + self.sep
-            if self.has_valid_timestamp(meta):
-                basepath = basepath + meta['time'][2] + self.sep + meta['time'][0] + self.sep
-            filename = "event_" + self.get_asset_name(meta['soup_url'])
-            path = basepath + filename + "." + meta['soup_url'].split(".")[-1]
-            if os.path.isfile(path) == True:
-                print("\t\t\tSkip " + meta['soup_url'] + ": File exists")
-            else:
-                print("\t\t\tsoup_ulr: " + meta['soup_url'] + " -> " + path)
-                self.assertdir(basepath)
-                r = requests.get(meta['soup_url'], allow_redirects=True)
-                with open(path, "wb") as tf:
-                    tf.write(r.content)
-                i = requests.get(meta['ical_url'], allow_redirects=True)
-                with open(basepath + filename + ".ical", "wb") as icf:
-                    icf.write(i.content)
-                self.write_raw(post)
+            meta['description'] = str(descelem)
+        return meta
 
     def process_regular(self, post):
         print("\t\tRegular:")
         meta = {}
-        meta['time'] = self.get_timstemp(post)
         h3elem = post.find("h3")
         content = {}
         if h3elem:
-            content['title'] = str(h3elem)
+            meta['title'] = str(h3elem)
         body = post.find("div", {'class':'body'})
-        content['body'] = str(body)
-        filename = "regular_" + post['id'] + ".json"
-        basepath = self.bup_dir + self.sep
-        if self.has_valid_timestamp(meta):
-            basepath = basepath + meta['time'][2] + self.sep + meta['time'][0] + self.sep
-
-        path = basepath + filename
-        if os.path.isfile(path) == True:
-            print("\t\t\tSkip: " + filename + ": File exists")
-        else:
-            self.assertdir(basepath)
-            print("\t\t\t-> " + path)
-            with open(path, "w") as rf:
-                json.dump(content, rf)
-            self.write_raw(post)
+        meta['body'] = str(body)
+        return meta
 
     def process_unkown(self, post, post_type):
         print("\t\tUnsuported tpye:")
         print("\t\t\tType: " + post_type)
         meta = {}
-        meta['type'] = post_type
-        meta['time'] = self.get_timstemp(post)
-        content = post.prettify()
-        qhash = hashlib.sha256(content.encode())
-        hashsum = str(qhash.hexdigest().upper())
-        meta['content'] = content
-        filename = "unknown_" + hashsum + ".txt"
-        basepath = self.bup_dir + self.sep
-        if self.has_valid_timestamp(meta):
-            basepath = basepath + meta['time'][2] + self.sep + meta['time'][0] + self.sep
-        path = basepath + filename
-        if os.path.isfile(path) == True:
-            print("\t\t\tSkip: " + filename + ": File exists")
-        else:
-            print("\t\t\t-> " + path)
-            self.write_raw(post)
+        meta['unsupported'] = True
+        return meta
 
     def get_meta(self, post):
         meta = {}
@@ -356,25 +222,30 @@ class Soup:
             post_type = post.get('class')[1]
             timestamp = self.get_timestamp(post)
             meta = self.get_meta(post)
-            self.write_meta(meta, timestamp)
+            meta['raw'] = str(post)
+
             if post_type == "post_image":
-                self.process_image(post)
+                meta['post'] = self.process_image(post)
             elif post_type == "post_quote":
-                self.process_quote(post)
+                meta['post'] = self.process_quote(post)
             elif post_type == "post_video":
-                self.process_video(post)
+                meta['post'] = self.process_video(post)
             elif post_type == "post_link":
-                self.process_link(post)
+                meta['post'] = self.process_link(post)
             elif post_type == "post_file":
-                self.process_file(post)
+                meta['post'] = self.process_file(post)
             elif post_type == "post_review":
-                self.process_review(post)
+                meta['post'] = self.process_review(post)
             elif post_type == "post_event":
-                self.process_event(post)
+                meta['post'] = self.process_event(post)
             elif post_type == "post_regular":
-                self.process_regular(post)
+                meta['post'] = self.process_regular(post)
             else:
-                self.process_unkown(post, post_type)
+                meta['post'] = self.process_unkown(post, post_type)
+
+            self.process_assets(meta, post)
+            self.write_meta(meta, timestamp)
+
 
     def backup(self, cont_url = ""):
         dlurl = self.rooturl + cont_url
