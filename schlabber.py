@@ -2,6 +2,7 @@
 import os
 import stat
 import argparse
+import datetime
 import requests
 import json
 import pprint
@@ -39,13 +40,21 @@ class Soup:
 
     def get_timstemp(self, post):
         for time_meta in post.find_all("abbr"):
-            return time_meta.get('title').strip().split(" ")
+            ts = time_meta.get('title')
+            return datetime.datetime.strptime(ts, '%b %d %Y %H:%M:%S %Z').isoformat()
         return None
 
-    def write_meta(self, meta):
-        basepath = self.bup_dir + self.sep
-        self.assertdir(basepath + "meta" + self.sep )
-        filename = basepath + "meta" + self.sep + meta['id'] + ".json"
+    def get_timestamp(self, post):
+        for time_meta in post.find_all("abbr"):
+            ts = time_meta.get('title')
+            return datetime.datetime.strptime(ts, '%b %d %Y %H:%M:%S %Z')
+        return None
+
+    def write_meta(self, meta, timestamp):
+        date = timestamp.date().isoformat()
+        basepath = self.bup_dir + self.sep + "meta" + self.sep + date + self.sep
+        self.assertdir(basepath)
+        filename = basepath + meta['id'] + ".json"
         if os.path.isfile(filename):
             # skip, it exists:
             return
@@ -318,7 +327,7 @@ class Soup:
     def get_meta(self, post):
         meta = {}
         meta['type'] = post.get('class')[1]
-        meta['time'] = self.get_timstemp(post)
+        meta['time'] = self.get_timestamp(post).isoformat()
         meta['id'] = post['id']
         permalink = post.select('.meta .icon.type a')[0]
         author = post.select('.meta div.author .user_container')[0]
@@ -333,8 +342,9 @@ class Soup:
         posts = cur_page.find_all('div', {"class": "post"})
         for post in posts:
             post_type = post.get('class')[1]
+            timestamp = self.get_timestamp(post)
             meta = self.get_meta(post)
-            self.write_meta(meta)
+            self.write_meta(meta, timestamp)
             if post_type == "post_image":
                 self.process_image(post)
             elif post_type == "post_quote":
