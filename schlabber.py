@@ -42,10 +42,10 @@ class Soup:
         return None
 
     def write_meta(self, meta, timestamp):
-        date = timestamp.date().isoformat()
-        basepath = self.bup_dir + self.sep + "meta" + self.sep + date + self.sep
+        year = timestamp.date().year
+        basepath = self.bup_dir + self.sep + "posts" + self.sep + str(year) + self.sep
         self.assertdir(basepath)
-        filename = basepath + meta['id'] + ".json"
+        filename = basepath + timestamp.isoformat() + "-" + meta['type'] + '-' + meta['id'] + ".json"
         if os.path.isfile(filename):
             # skip, it exists:
             return
@@ -172,7 +172,9 @@ class Soup:
 
     def get_meta(self, post):
         meta = {}
-        meta['type'] = post.get('class')[1]
+        css_type = post.get('class')[1]
+        meta['css_type'] = css_type
+        meta['type'] = css_type.replace("post_", "")
         meta['time'] = self.get_timestamp(post).isoformat()
         meta['id'] = post['id']
         meta['nsfw'] = 'f_nsfw' in post.get('class')
