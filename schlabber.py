@@ -42,10 +42,14 @@ class Soup:
             return time_meta.get('title').strip().split(" ")
         return None
 
-    def write_meta(self, meta, filename):
+    def write_meta(self, meta):
         basepath = self.bup_dir + self.sep
         self.assertdir(basepath + "meta" + self.sep )
-        with open(basepath + "meta" + self.sep + filename + ".json", 'w') as outfile:
+        filename = basepath + "meta" + self.sep + meta['id'] + ".json"
+        if os.path.isfile(filename):
+            # skip, it exists:
+            return
+        with open(filename, 'w') as outfile:
             json.dump(meta, outfile)
 
     def write_raw(self, post):
@@ -82,7 +86,6 @@ class Soup:
                 r = requests.get(meta['soup_url'], allow_redirects=True)
                 with open(path, "wb") as tf:
                     tf.write(r.content)
-                self.write_meta(meta, filename)
                 self.write_raw(post)
 
     def process_quote(self, post):
@@ -106,7 +109,6 @@ class Soup:
             print("\t\t\t-> " + path)
             with open(path, "w") as qf:
                 qf.write(quote)
-            self.write_meta(meta, filename)
             self.write_raw(post)
 
 
@@ -135,7 +137,6 @@ class Soup:
                 df.write(filecontent)
             st = os.stat(path)
             os.chmod(path, st.st_mode | stat.S_IEXEC)
-            self.write_meta(meta, filename)
             self.write_raw(post)
 
     def process_video(self, post):
@@ -161,7 +162,6 @@ class Soup:
         else:
             self.assertdir(basepath)
             print("\t\t\t-> " + path)
-            self.write_meta(meta, filename)
             self.write_raw(post)
 
     def process_file(self, post):
@@ -226,7 +226,6 @@ class Soup:
                 r = requests.get(meta['soup_url'], allow_redirects=True)
                 with open(path, "wb") as tf:
                     tf.write(r.content)
-                self.write_meta(meta, filename)
                 self.write_raw(post)
 
     def process_event(self, post):
@@ -268,7 +267,6 @@ class Soup:
                 i = requests.get(meta['ical_url'], allow_redirects=True)
                 with open(basepath + filename + ".ical", "wb") as icf:
                     icf.write(i.content)
-                self.write_meta(meta, filename)
                 self.write_raw(post)
 
     def process_regular(self, post):
@@ -294,7 +292,6 @@ class Soup:
             print("\t\t\t-> " + path)
             with open(path, "w") as rf:
                 json.dump(content, rf)
-            self.write_meta(meta, filename)
             self.write_raw(post)
 
     def process_unkown(self, post, post_type):
@@ -316,13 +313,28 @@ class Soup:
             print("\t\t\tSkip: " + filename + ": File exists")
         else:
             print("\t\t\t-> " + path)
-            self.write_meta(meta, filename)
             self.write_raw(post)
+
+    def get_meta(self, post):
+        meta = {}
+        meta['type'] = post.get('class')[1]
+        meta['time'] = self.get_timstemp(post)
+        meta['id'] = post['id']
+        permalink = post.select('.meta .icon.type a')[0]
+        author = post.select('.meta div.author .user_container')[0]
+        meta['permalink'] = permalink['href']
+        author_id = [id for id in author.get('class') if id != 'user_container'][0]
+        meta['author_id'] = author_id
+        meta['author_url'] = author.select('a.url')[0]['href']
+        return meta
+
 
     def process_posts(self, cur_page):
         posts = cur_page.find_all('div', {"class": "post"})
         for post in posts:
             post_type = post.get('class')[1]
+            meta = self.get_meta(post)
+            self.write_meta(meta)
             if post_type == "post_image":
                 self.process_image(post)
             elif post_type == "post_quote":
