@@ -228,8 +228,14 @@ class Soup:
             self.write_meta(meta, timestamp)
 
 
-    def backup(self, cont_url = ""):
-        dlurl = self.rooturl + cont_url
+    def backup(self, cont_id = None):
+        dlurl = self.rooturl
+        if cont_id != "":
+            # normalize the ID:
+            cont_id = cont_id.replace("/since/", "")
+            cont_id = cont_id.replace("post", "")
+            dlurl += "/since/" + cont_id
+
         while True:
             print("Get: " + dlurl)
             dl = requests.get(dlurl)
