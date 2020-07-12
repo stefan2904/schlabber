@@ -82,8 +82,8 @@ class Soup:
 
     def process_image(self, post):
         meta = {}
-        for caption in post.find_all("div", {'class': 'caption'}):
-            meta['source'] = caption.find('a').get("href")
+        for link in post.select(".imagecontainer>.caption>a"):
+            meta['source'] = link.get("href")
         for desc in post.find_all("div", {'class': 'description'}):
             meta['description'] = str(desc)
         return meta
@@ -211,7 +211,7 @@ class Soup:
             timestamp = self.get_timestamp(post)
             meta = self.get_meta(post)
             meta['raw'] = str(post)
-            print("\t\t%s: %s %s" % (timestamp, post_type, meta['id']))
+            print("\t\t%s: %s %s" % (timestamp, post_type, meta['permalink']))
 
             if post_type == "post_image":
                 meta['post'] = self.process_image(post)
