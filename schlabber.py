@@ -37,20 +37,20 @@ class Soup:
         return name.split('/')[-1]
 
     def get_timestamp(self, post):
-        for time_meta in post.find_all("abbr"):
+        for time_meta in post.select("span.time>abbr"):
             ts = time_meta.get('title')
             return datetime.datetime.strptime(ts, '%b %d %Y %H:%M:%S %Z')
         return None
 
     def write_meta(self, meta, timestamp):
         year = 'unknown'
-        timestr = 'unknown'
+        timestr = ''
         if timestamp:
             year = timestamp.date().year
-            timestr = timestamp.isoformat()
+            timestr = timestamp.isoformat() + '-'
         basepath = self.bup_dir + self.sep + "posts" + self.sep + str(year) + self.sep
         self.assertdir(basepath)
-        filename = basepath + timestr + "-" + meta['type'] + '-' + meta['id'] + ".json"
+        filename = basepath + timestr + meta['type'] + '-' + meta['id'] + ".json"
         if os.path.isfile(filename):
             # skip, it exists:
             return
