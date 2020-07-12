@@ -329,12 +329,24 @@ class Soup:
         meta['type'] = post.get('class')[1]
         meta['time'] = self.get_timestamp(post).isoformat()
         meta['id'] = post['id']
+        meta['nsfw'] = 'f_nsfw' in post.get('class')
+
+        # permalink:
         permalink = post.select('.meta .icon.type a')[0]
-        author = post.select('.meta div.author .user_container')[0]
         meta['permalink'] = permalink['href']
+
+        # author:
+        author = post.select('.meta div.author .user_container')[0]
         author_id = [id for id in author.get('class') if id != 'user_container'][0]
         meta['author_id'] = author_id
         meta['author_url'] = author.select('a.url')[0]['href']
+
+        # tags:
+        tags = []
+        for tag_link in post.select('.content-container>.content>.tags>a'):
+            tag = {"link": tag_link['href'], "name": tag_link.text}
+            tags.append(tag)
+        meta['tags'] = tags
         return meta
 
 
