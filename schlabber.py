@@ -66,9 +66,9 @@ class Soup:
                 basepath = self.bup_dir + self.sep + 'assets' + self.sep
                 path = basepath + filename
                 if os.path.isfile(path) == True:
-                    print("\t\t\tSkip " + url + ": File exists")
+                    print("\t\t\tSkip asset " + url + ": File exists")
                 else:
-                    print("\t\t\tsoup_url: " + url + " -> " + path)
+                    print("\t\t\tAsset URL: " + url + " -> " + path)
                     self.assertdir(basepath)
                     r = requests.get(url, allow_redirects=True)
                     with open(path, "wb") as tf:
@@ -77,7 +77,6 @@ class Soup:
         meta['assets'] = assets
 
     def process_image(self, post):
-        print("\t\tImage:")
         meta = {}
         for caption in post.find_all("div", {'class': 'caption'}):
             meta['source'] = caption.find('a').get("href")
@@ -86,14 +85,12 @@ class Soup:
         return meta
 
     def process_quote(self, post):
-        print("\t\tQuote:")
         meta = {}
         meta['quote'] = str(post.find("span", {"class", 'body'}))
         meta['attribution'] = str(post.find("cite"))
         return meta
 
     def process_link(self, post):
-        print("\t\tLink:")
         meta = {}
         linkelem = post.find("h3")
         meta["link_title"] = str(linkelem)
@@ -102,7 +99,6 @@ class Soup:
         return meta
 
     def process_video(self, post):
-        print("\t\tVideo:")
         meta = {}
         meta['embed'] = str(post.find("div", {'class':'embed'}))
         bodyelem = post.find("div", {'class':'body'})
@@ -111,7 +107,6 @@ class Soup:
         return meta
 
     def process_file(self, post):
-        print("\t\tFile:")
         meta = {}
         linkelem = post.find("h3")
         if linkelem:
@@ -121,7 +116,6 @@ class Soup:
         return meta
 
     def process_review(self, post):
-        print("\t\tReview:")
         meta = {}
         embed = post.find("div", {'class':'embed'})
         if embed:
@@ -136,7 +130,6 @@ class Soup:
         return meta
 
     def process_event(self, post):
-        print("\t\tEvent:")
         meta = {}
         for link in post.find_all('div', {"class":"imagecontainer"}):
             lightbox = link.find("a", {"class": "lightbox"})
@@ -161,7 +154,6 @@ class Soup:
         return meta
 
     def process_regular(self, post):
-        print("\t\tRegular:")
         meta = {}
         h3elem = post.find("h3")
         content = {}
@@ -211,6 +203,7 @@ class Soup:
             timestamp = self.get_timestamp(post)
             meta = self.get_meta(post)
             meta['raw'] = str(post)
+            print("\t\t%s: %s %s" % (timestamp, post_type, meta['id']))
 
             if post_type == "post_image":
                 meta['post'] = self.process_image(post)
