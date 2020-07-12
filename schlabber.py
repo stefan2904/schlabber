@@ -7,6 +7,7 @@ import requests
 import json
 import pprint
 import hashlib
+import time
 from bs4 import BeautifulSoup
 
 class Soup:
@@ -252,7 +253,7 @@ class Soup:
                     break
             elif dl.status_code > 500:
                 print("Received 500 status, backing off...")
-                sleep(5)
+                time.sleep(5)
             elif dl.status_code > 400:
                 print("Page not found")
                 return
