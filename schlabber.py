@@ -135,12 +135,6 @@ class Soup:
 
     def process_event(self, post):
         meta = {}
-        for link in post.find_all('div', {"class":"imagecontainer"}):
-            lightbox = link.find("a", {"class": "lightbox"})
-            if lightbox:
-                meta['soup_url'] = lightbox.get('href')
-            else:
-                meta['soup_url'] = link.find("img").get('src')
         h3elem = post.find("a", {"class":"url"})
         meta['url'] = h3elem.get("href")
         meta['title'] = str(h3elem)
@@ -148,10 +142,10 @@ class Soup:
         dtelem = post.find("abbr", {'class':'dtend'})
         if dtelem:
             meta['date_end'] = dtelem.get("title")
-        meta['location'] = post.find("span", {'class':'location'})
-        meta['ical_url'] = post.find("div", {'class': 'info'}).find('a').get('href')
+        meta['location'] = str(post.find("span", {'class':'location'}))
+        meta['ical_url'] = str(post.find("div", {'class': 'info'}).find('a').get('href'))
         i = requests.get(meta['ical_url'], allow_redirects=True)
-        meta['ical_xml'] = i.content
+        meta['ical_xml'] = str(i.content)
         descelem = post.find("div", {'class','description'})
         if descelem:
             meta['description'] = str(descelem)
