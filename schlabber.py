@@ -14,9 +14,6 @@ class Soup:
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
 
-    def has_valid_timestamp(self, meta):
-        return True
-
     def __init__(self, soup, bup_dir):
         self.rooturl = "http://"+soup+".soup.io"
         self.bup_dir = os.path.abspath(bup_dir)
@@ -35,17 +32,8 @@ class Soup:
         self.dlnextfound = False
         return ""
 
-    def get_asset_name(self, name):
-        return name.split('/')[-1].split('.')[0]
-
     def get_asset_filename(self, name):
         return name.split('/')[-1]
-
-    def get_timstemp(self, post):
-        for time_meta in post.find_all("abbr"):
-            ts = time_meta.get('title')
-            return datetime.datetime.strptime(ts, '%b %d %Y %H:%M:%S %Z').isoformat()
-        return None
 
     def get_timestamp(self, post):
         for time_meta in post.find_all("abbr"):
