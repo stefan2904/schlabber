@@ -247,14 +247,21 @@ class Soup:
         while True:
             print("Get: " + dlurl)
             dl = requests.get(dlurl)
-            page = BeautifulSoup(dl.content, 'html.parser')
-            print("Looking for next Page")
-            dlurl = self.rooturl + self.find_next_page(page)
-            print("Process Posts")
-            self.process_posts(page)
-            if self.dlnextfound == False:
-                print("no next found.")
-                break
+            if dl.status_code == 200:
+                page = BeautifulSoup(dl.content, 'html.parser')
+                print("Looking for next Page")
+                dlurl = self.rooturl + self.find_next_page(page)
+                print("Process Posts")
+                self.process_posts(page)
+                if self.dlnextfound == False:
+                    print("no next found.")
+                    break
+            elif dl.status_code > 500:
+                print("Received 500 status, backing off...")
+                sleep(5)
+            elif dl.status_code > 400:
+                print("Page not found")
+                return
 
 def main(soups, bup_dir, cont_from):
     for site in soups:
