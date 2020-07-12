@@ -116,7 +116,7 @@ class Soup:
         if linkelem:
             meta["link_title"] = str(linkelem)
             meta["url"] = linkelem.find('a').get('href')
-        meta["body"] = post.find('div', {'class','body'})
+        meta["body"] = str(post.find('div', {'class','body'}))
         return meta
 
     def process_review(self, post):
