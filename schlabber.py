@@ -15,7 +15,7 @@ class Soup:
             os.makedirs(dirname)
 
     def __init__(self, soup, bup_dir):
-        self.rooturl = "http://"+soup+".soup.io"
+        self.rooturl = "https://"+soup+".soup.io"
         self.bup_dir = os.path.abspath(bup_dir)
         self.assertdir(self.bup_dir)
         self.dlnextfound = False
