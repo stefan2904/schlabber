@@ -238,11 +238,13 @@ class Soup:
             cont_id = cont_id.replace("/since/", "")
             cont_id = cont_id.replace("post", "")
             dlurl += "/since/" + cont_id
+        backoff_factor = 1
 
         while True:
             print("Get: " + dlurl)
             dl = requests.get(dlurl)
             if dl.status_code == 200:
+                backoff_factor = 1
                 page = BeautifulSoup(dl.content, 'html.parser')
                 print("Looking for next Page")
                 dlurl = self.rooturl + self.find_next_page(page)
@@ -251,9 +253,14 @@ class Soup:
                 if self.dlnextfound == False:
                     print("no next found.")
                     break
+            if dl.status_code == 429:
+                print("Rate-limited, backing off %ds..." % 5 * backoff_factor)
+                time.sleep(5 * backoff_factor)
+                backoff_factor += 1
             elif dl.status_code > 500:
-                print("Received 500 status, backing off...")
-                time.sleep(5)
+                print("Received 500 status, backing off %ds..." % 5 * backoff_factor)
+                time.sleep(5 * backoff_factor)
+                backoff_factor += 1
             elif dl.status_code > 400:
                 print("Page not found")
                 return
